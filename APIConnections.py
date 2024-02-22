@@ -1,21 +1,16 @@
 import requests
 import openai
+from openai import OpenAI
 
 # Endpoints
 funguild_endpoint = "https://www.mycoportal.org/funguild/services/api/db_return.php"
 fdex_endpoint = "https://www.mycoportal.org/fdex/services/api/query.php"
-
-
-#GPT Key
-openai.api_key = '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'
-
 
 # Paramaters
 params = {
     'qField': 'taxon',
     'qText': 'Magnaporthe'
 }
-
 # Generate the response
 funguild_response = requests.get(funguild_endpoint, params=params)
 fdex_response = requests.get(fdex_endpoint, params=params)
@@ -36,10 +31,11 @@ else:
     print("Error accessing fdex API. Status code:", fdex_response.status_code)
 
 
+client = OpenAI(
+  api_key= "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")
 
 #GPT Response
-response = openai.Completion.create(
-    model="text-davinci-002",  
-    prompt="Tell me a joke",
-    max_tokens=5  
+response = client.completions.create(
+  model="gpt-3.5-turbo-instruct",
+  prompt="Write a tagline for an ice cream shop."
 )
