@@ -1,41 +1,76 @@
+import json
 import requests
-import openai
-from openai import OpenAI
+import subprocess
+import os
 
 # Endpoints
-funguild_endpoint = "https://www.mycoportal.org/funguild/services/api/db_return.php"
-fdex_endpoint = "https://www.mycoportal.org/fdex/services/api/query.php"
+funguildEndpoint = "https://www.mycoportal.org/funguild/services/api/db_return.php"
+fdexEndpoint = "https://www.mycoportal.org/fdex/services/api/query.php"
 
-# Paramaters
-params = {
-    'qField': 'taxon',
-    'qText': 'Magnaporthe'
+# Parameters
+paramsFun = {
+    'qField': 'taxonomicLevel',
+    'qText': '13'
 }
+
+paramsDex = {
+    'qField': 'rankCode',
+    'qText': '13'
+}
+
+# Function to open files 
+def openFile(filename):
+    if os.name == 'nt':  # Windows
+        os.startfile(filename)
+    elif os.name == 'posix':  # macOS, Linux
+        subprocess.run(['open' if os.uname().sysname == 'Darwin' else 'xdg-open', filename])
+
 # Generate the response
-funguild_response = requests.get(funguild_endpoint, params=params)
-fdex_response = requests.get(fdex_endpoint, params=params)
+funguildResponse = requests.get(funguildEndpoint, params=paramsFun)
+fdexResponse = requests.get(fdexEndpoint, params=paramsDex)
 
+# Extract taxon names for FUNGuild
+def extractFunguildTaxonNames(data):
+    if isinstance(data, list):
+        taxonNames = [entry['taxon'] for entry in data if 'taxon' in entry]
+        return taxonNames
+    else:
+        return []
 
-# Print data if found
-if funguild_response.status_code == 200:
-    funguild_data = funguild_response.json()
-    print("FUNGuild Data:", funguild_data)
+# Extract taxon names for FDex data
+def extractFdexTaxonNames(data):
+    if isinstance(data, list):
+        taxonNames = [entry['taxon'] for entry in data if 'taxon' in entry and entry.get('rankCode') == '13']
+        return taxonNames
+    else:
+        return []
+
+# Process FUNGuild 
+if funguildResponse.status_code == 200:
+    funguildData = funguildResponse.json()
+    funguildTaxonNames = extractFunguildTaxonNames(funguildData)
+    print("FUNGuild Taxon Names:", funguildTaxonNames)
+    funguildFilename = 'funguild_taxonNames.json'  # Save to file
+    with open(funguildFilename, 'w') as file:
+        json.dump(funguildTaxonNames, file, indent=4)
+    openFile(funguildFilename)
 else:
-    print("Error accessing FUNGuild API. Status code:", funguild_response.status_code)
+    print("Error accessing FUNGuild API. Status code:", funguildResponse.status_code)
 
-if fdex_response.status_code == 200:
-    fdex_data = fdex_response.json()
-
-    print("fdex Data:", fdex_data)
+# Process FDex 
+if fdexResponse.status_code == 200:
+    try:
+        fdexData = fdexResponse.json()
+        fdexTaxonNames = extractFdexTaxonNames(fdexData)
+        print("FDex Taxon Names:", fdexTaxonNames)
+        if fdexTaxonNames:
+            fdexFilename = 'fdex_taxonNames.json' # Save to file if not empty
+            with open(fdexFilename, 'w') as file:
+                json.dump(fdexTaxonNames, file, indent=4)
+            openFile(fdexFilename)
+        else:
+            print("No taxon names.")
+    except json.JSONDecodeError:
+        print("Failed to decode FDex response as JSON. Response was:", fdexResponse.text)
 else:
-    print("Error accessing fdex API. Status code:", fdex_response.status_code)
-
-
-client = OpenAI(
-  api_key= "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")
-
-#GPT Response
-response = client.completions.create(
-  model="gpt-3.5-turbo-instruct",
-  prompt="Write a tagline for an ice cream shop."
-)
+    print("Error accessing FDex API. Status code:", fdexResponse.status_code)
